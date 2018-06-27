@@ -44,7 +44,7 @@ public class ClusterController implements AppConstanst {
             return testResp;
         }
 
-        registry.addCluster(name, zkCons);
+        registry.createCluster(name, zkCons);
         return ResponseEntity.ok("");
     }
 
@@ -68,6 +68,7 @@ public class ClusterController implements AppConstanst {
 
     @DeleteMapping("{clusterName}")
     public ResponseEntity deleteCluster(@PathVariable("clusterName") String clusterName) throws JsonProcessingException {
+        registry.deleteCluster(clusterName);
         return ResponseEntity.ok("");
     }
 

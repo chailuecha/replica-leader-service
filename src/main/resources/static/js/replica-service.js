@@ -1,14 +1,15 @@
 
 
 var clusterMap = {};
+var addClusterPanel = new AddClusterPanel();
 
 $(document).ready( function () {
     $('#cluster-tabs').on("click", "a", function (e) {
+        clearAlert();
         e.preventDefault();
         $(this).tab('show')
     })
-
-    var addClusterPanel = new AddClusterPanel();
+    
     renderAllClusters();
 })
 
@@ -18,6 +19,10 @@ function alertSuccess(text) {
 
 function alertError(text) {
     $("#main-alert").removeClass().addClass("alert alert-danger").html(text).show();
+}
+
+function clearAlert() {
+    $("#main-alert").removeClass().html("").hide();
 }
 
 function selectAddingClusterTab() {
@@ -56,8 +61,18 @@ function AddClusterPanel() {
     });
 
     this.addCluster = function () {
-        var clusterName = this.clusterNameInput.val();
-        var zkCons = this.zkConsInput.val();
+        clearAlert();
+
+        var clusterName = $.trim( this.clusterNameInput.val() );
+        var zkCons = $.trim( this.zkConsInput.val() );
+
+        this.clusterNameInput.val(clusterName)
+        this.zkConsInput.val(zkCons)
+
+        if( clusterMap[clusterName] !== undefined){
+            alertError("Cluster " + clusterName + " is already existed")
+            return
+        }
 
         $.ajax({
             method: "PUT",
@@ -67,11 +82,19 @@ function AddClusterPanel() {
         }).done( function (response) {
             var cluster = new ClusterPanel(clusterName, zkCons);
             clusterMap[clusterName] = cluster;
+
             cluster.addPanel();
+            cluster.selectCluster();
+            self.clearInput();
 
         }).fail( function (jqXHR, textStatus) {
             alertError( "ERROR : " + jqXHR.responseText)
-        });
+        })
+    }
+    
+    this.clearInput = function () {
+        this.clusterNameInput.val("");
+        this.zkConsInput.val("");
     }
 }
 
@@ -82,16 +105,30 @@ function ClusterPanel(clusterName, zkCons) {
     this.clusterTab = null;
     this.clusterPanel = null;
 
+    this.startOrPauseBn = null;
+    this.editBn = null;
+    this.runInterval = null;
+    this.runIntervalUnit = null;
+
+    this.removeClusterBn = null;
+
     this.addPanel = function () {
         this.clusterTab = $(this.newClusterTab());
         $('#cluster-tabs').append( this.clusterTab  );
 
         this.clusterPanel = $(this.newClusterPanel());
+        this.startOrPauseBn = this.clusterPanel.find("button[name='startOrPauseBn']");
+        this.editBn = this.clusterPanel.find("button[name='editBn']");
+        this.runInterval = this.clusterPanel.find("input[name='runInterval']");
+        this.runIntervalUnit = this.clusterPanel.find("select[name='runIntervalUnit']");
+
+        this.removeClusterBn = this.clusterPanel.find("button.remove-cluster");
+        this.clusterPanel.find(".selectpicker").selectpicker("render");
         $('#cluster-panels').append( this.clusterPanel );
 
         self.bindEvent();
     }
-
+    
     this.newClusterTab = function () {
         var template = $('#cluster-tab-tpl').html();
         Mustache.parse(template);   // optional, speeds up future uses
@@ -104,13 +141,37 @@ function ClusterPanel(clusterName, zkCons) {
         return Mustache.render(template, {tabId: clusterName,  tabName : clusterName,  zkCons : zkCons });
     }
 
+    this.selectCluster = function () {
+        this.clusterTab.find('a[role="tab"]').click();
+    }
+    
     this.bindEvent = function() {
-        this.clusterPanel.find("button.remove-cluster").click( function () {
+        this.removeClusterBn.click( function () {
+            clearAlert();
             self.removeCluster();
             selectAddingClusterTab();
         })
+
+        this.startOrPauseBn.click( function () {
+            clearAlert();
+
+            if ( $(this).html() == "Start" ){
+                self.startService();
+                $(this).html("Pause");
+                self.enableInput(false);
+
+            }else{
+                self.pauseService();
+                $(this).html("Start");
+            }
+        })
     }
-    
+
+    this.enableInput = function (enable) {
+        this.clusterPanel.find("input").prop('disabled', enable);
+        this.clusterPanel.find("select").prop('disabled', enable);
+    }
+
     this.removeCluster = function () {
         $.ajax({
             method : "DELETE",
@@ -125,5 +186,13 @@ function ClusterPanel(clusterName, zkCons) {
         }).fail(function (jqXHR, textStatus) {
             alertError( "ERROR : " + jqXHR.responseText)
         });
+    }
+
+    this.startService = function () {
+
+    }
+
+    this.pauseService = function () {
+
     }
 }

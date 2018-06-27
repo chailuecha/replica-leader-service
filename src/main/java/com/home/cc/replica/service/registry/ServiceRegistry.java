@@ -3,7 +3,8 @@ package com.home.cc.replica.service.registry;
 import java.util.List;
 
 public interface ServiceRegistry {
-    void addCluster(String name, String zkCons);
+    void createCluster(String name, String zkCons);
+    void deleteCluster(String name);
     List<ClusterInfo> getAllClusters();
 
 }

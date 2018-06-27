@@ -1,5 +1,6 @@
 package com.home.cc.replica.service.registry;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.home.cc.replica.service.AppConstanst;
 import com.home.cc.replica.service.ClusterController;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PreDestroy;
+import java.io.IOException;
 import java.util.List;
 
 import static com.home.cc.replica.service.util.LambdaExceptionWrapper.throwingFunction;
@@ -40,7 +42,6 @@ public class ZkServiceRegistry implements ServiceRegistry, AppConstanst {
                 //Somebody just created the root node before us. That is alright.
             }
         }
-
     }
 
     @PreDestroy
@@ -49,22 +50,44 @@ public class ZkServiceRegistry implements ServiceRegistry, AppConstanst {
     }
 
     @Override
-    public void addCluster(String name, String zkCons) {
-        lock.executeWithLock( () -> {
-            if( !zk.exists( path.cluster(name) )){
-                zk.createPersistent( path.cluster(name), mapper.writeValueAsString( new ClusterInfo(name, zkCons)) );
+    public void createCluster(String name, String zkCons) {
+        lock.executeWithLock( () -> createClusterInZk(name, zkCons) );
+    }
 
-            }else{
-                throw new ReplicaServiceException("Cluster name " + name + " is already existed");
-            }
-        });
+    @Override
+    public void deleteCluster(String name) {
+        lock.executeWithLock( () -> deleteClusterInZk(name) );
     }
 
     @Override
     public List<ClusterInfo> getAllClusters() {
-        return zk.getChildren(path.root()).stream()
-                .map( throwingFunction( cluster -> (String)zk.readData( path.cluster(cluster))) )
-                .map( throwingFunction( info  -> mapper.readValue(info, ClusterInfo.class)) )
-                .collect( toList());
+        return lock.produceWithLock( () -> {
+            return zk.getChildren(path.root()).stream()
+                    .map( throwingFunction( this::readClusterInfo ) )
+                    .collect( toList());
+        });
+    }
+
+    private ClusterInfo readClusterInfo(String clusterName) throws IOException {
+        String infoJson  = (String)zk.readData( path.cluster(clusterName) );
+        return mapper.readValue(infoJson, ClusterInfo.class);
+    }
+
+    private void createClusterInZk(String name, String zkCons) throws JsonProcessingException {
+        if( !zk.exists( path.cluster(name) )){
+            zk.createPersistent( path.cluster(name), mapper.writeValueAsString( new ClusterInfo(name, zkCons)) );
+
+        }else{
+            throw new ReplicaServiceException("Cluster name " + name + " is already existed");
+        }
+    }
+
+    private void deleteClusterInZk(String name) throws JsonProcessingException {
+        if( zk.exists( path.cluster(name) )){
+            zk.delete( path.cluster(name) );
+
+        }else{
+            throw new ReplicaServiceException("Cluster name to be deleted : " + name + " is not existed");
+        }
     }
 }
