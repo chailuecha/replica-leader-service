@@ -23,11 +23,10 @@
     font-size: 20px;
 }
 
-.input-group-btn  button {
-    min-width:80px;
-    text-align:center;
-}
-
 .input-group-addon{
     min-width:180px;
+}
+
+.tab-pane button{
+    min-width: 100px;
 }

@@ -99,26 +99,45 @@ function AddClusterPanel() {
 }
 
 
+
 function ClusterPanel(clusterName, zkCons) {
     var self = this;
 
-    this.clusterTab = null;
+    var PanelStatus = {
+        //all these strange boolean just because Mustache doesn't play well with logic expression in templating
+        INIT : { statusInit : true},
+        STARTED : { statusStarted : true},
+        PAUSED : { statusPaused : true}
+    }
+
+    this.clusterTabHeader = null;
     this.clusterPanel = null;
 
-    this.startOrPauseBn = null;
-    this.editBn = null;
+    this.status = PanelStatus.INIT;
+    this.actionBnGroup = null;
+    this.startBn = null;
+    this.stopBn = null;
+    this.pauseBn = null;
+
+
+
     this.runInterval = null;
     this.runIntervalUnit = null;
 
     this.removeClusterBn = null;
 
     this.addPanel = function () {
-        this.clusterTab = $(this.newClusterTab());
-        $('#cluster-tabs').append( this.clusterTab  );
+        this.clusterTabHeader = $(this.newClusterTabHeader());
+        $('#cluster-tabs').append( this.clusterTabHeader  );
 
         this.clusterPanel = $(this.newClusterPanel());
-        this.startOrPauseBn = this.clusterPanel.find("button[name='startOrPauseBn']");
-        this.editBn = this.clusterPanel.find("button[name='editBn']");
+
+        this.actionBnGroup = this.clusterPanel.find("div.action-bn-group");
+        this.startBn = this.clusterPanel.find("button[name='start']");
+        this.stopBn = this.clusterPanel.find("button[name='stop']");
+        this.pauseBn = this.clusterPanel.find("button[name='pause']");
+        this.renderActionBn();
+
         this.runInterval = this.clusterPanel.find("input[name='runInterval']");
         this.runIntervalUnit = this.clusterPanel.find("select[name='runIntervalUnit']");
 
@@ -128,8 +147,17 @@ function ClusterPanel(clusterName, zkCons) {
 
         self.bindEvent();
     }
+
+    this.renderActionBn = function () {
+        var template = $('#cluster-action-bn-tpl').html();
+        Mustache.parse(template);   // optional, speeds up future uses
+
+        var bnGroup = Mustache.render(template, this.status );
+        this.actionBnGroup.empty().append(bnGroup);
+    }
+
     
-    this.newClusterTab = function () {
+    this.newClusterTabHeader = function () {
         var template = $('#cluster-tab-tpl').html();
         Mustache.parse(template);   // optional, speeds up future uses
         return Mustache.render(template, {tabId: clusterName , tabLabel : clusterName });
@@ -142,7 +170,7 @@ function ClusterPanel(clusterName, zkCons) {
     }
 
     this.selectCluster = function () {
-        this.clusterTab.find('a[role="tab"]').click();
+        this.clusterTabHeader.find('a[role="tab"]').click();
     }
     
     this.bindEvent = function() {
@@ -151,25 +179,45 @@ function ClusterPanel(clusterName, zkCons) {
             self.removeCluster();
             selectAddingClusterTab();
         })
-
-        this.startOrPauseBn.click( function () {
+        
+        this.actionBnGroup.on("click", "button", function () {
             clearAlert();
 
-            if ( $(this).html() == "Start" ){
+            var action = $(this).html();
+
+            if ( action == "Start" ){
                 self.startService();
-                $(this).html("Pause");
-                self.enableInput(false);
+                self.disableInput(true);
+                self.status = PanelStatus.STARTED;
+                self.renderActionBn();
+
+            }else if ( action == "Stop" ){
+                self.stopService();
+                self.disableInput(false);
+                self.status = PanelStatus.INIT;
+                self.renderActionBn();
+
+            }else if ( action == "Pause" ){
+                self.pauseService();
+                self.status = PanelStatus.PAUSED;
+                self.renderActionBn();
+
+            }else if ( action == "Resume" ){
+                self.resumeService();
+                self.status = PanelStatus.STARTED;
+                self.renderActionBn();
 
             }else{
-                self.pauseService();
-                $(this).html("Start");
+                alertError( "ERROR : Invalid cluster action : " + action);
             }
-        })
+        });
+
+
     }
 
-    this.enableInput = function (enable) {
-        this.clusterPanel.find("input").prop('disabled', enable);
-        this.clusterPanel.find("select").prop('disabled', enable);
+    this.disableInput = function (disable) {
+        this.clusterPanel.find("input").prop('disabled', disable);
+        this.clusterPanel.find("select").prop('disabled', disable);
     }
 
     this.removeCluster = function () {
@@ -192,7 +240,15 @@ function ClusterPanel(clusterName, zkCons) {
 
     }
 
+    this.stopService = function () {
+
+    }
+
     this.pauseService = function () {
+
+    }
+
+    this.resumeService = function () {
 
     }
 }
